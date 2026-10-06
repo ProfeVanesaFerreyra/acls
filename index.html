@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ACLS Academy: Misión Rescate</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;800&family=Share+Tech+Mono&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['Share Tech Mono', 'monospace'],
+                    },
+                    colors: {
+                        medical: {
+                            dark: '#0f172a',
+                            panel: '#1e293b',
+                            primary: '#0ea5e9',
+                            success: '#10b981',
+                            danger: '#ef4444',
+                            warning: '#f59e0b',
+                            neon: '#38bdf8'
+                        }
+                    },
+                    animation: {
+                        'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+                        'ping-slow': 'ping 2s cubic-bezier(0, 0, 0.2, 1) infinite',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #0f172a;
+            color: #f8fafc;
+            overflow-x: hidden;
+        }
+        .neon-border {
+            box-shadow: 0 0 10px rgba(14, 165, 233, 0.5), inset 0 0 10px rgba(14, 165, 233, 0.2);
+            border: 1px solid #0ea5e9;
+        }
+        .neon-border-danger {
+            box-shadow: 0 0 15px rgba(239, 68, 68, 0.6), inset 0 0 10px rgba(239, 68, 68, 0.3);
+            border: 1px solid #ef4444;
+        }
+        .monitor-screen {
+            background: radial-gradient(circle, #1e293b 0%, #020617 100%);
+            border: 2px solid #334155;
+            box-shadow: inset 0 0 20px #000;
+        }
+        .scanline {
+            width: 100%;
+            height: 100px;
+            background: linear-gradient(0deg, rgba(0,0,0,0) 0%, rgba(56,189,248,0.1) 50%, rgba(0,0,0,0) 100%);
+            opacity: 0.1;
+            position: absolute;
+            bottom: 100%;
+            animation: scanline 8s linear infinite;
+            pointer-events: none;
+        }
+        @keyframes scanline {
+            0% { bottom: 100%; }
+            100% { bottom: -100px; }
+        }
+        .btn-game {
+            transition: all 0.2s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: bold;
+        }
+        .btn-game:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        .btn-game:active {
+            transform: translateY(1px);
+        }
+        
+        /* Modal Styles */
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(4px);
+        }
+        
+        /* ECG Line Animation */
+        .ecg-path {
+            stroke-dasharray: 1000;
+            stroke-dashoffset: 1000;
+            animation: dash 3s linear infinite;
+        }
+        @keyframes dash {
+            to { stroke-dashoffset: 0; }
+        }
+        
+        .hidden { display: none !important; }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col font-sans relative">
+
+    <!-- Top Navigation / Status Bar -->
+    <header class="bg-medical-dark border-b border-slate-700 p-4 sticky top-0 z-50 neon-border flex justify-between items-center">
+        <div class="flex items-center gap-3 cursor-pointer" onclick="app.navigate('dashboard')">
+            <i class="fas fa-heartbeat text-medical-danger text-2xl animate-pulse"></i>
+            <h1 class="text-xl md:text-2xl font-black tracking-wider text-white">ACLS<span class="text-medical-primary">ACADEMY</span></h1>
+        </div>
+        <div class="flex items-center gap-4 font-mono text-sm">
+            <div class="hidden md:flex items-center gap-2 bg-slate-800 px-3 py-1 rounded-full border border-slate-600">
+                <i class="fas fa-star text-medical-warning"></i>
+                <span id="global-score">Puntos: 0</span>
+            </div>
+            <div id="game-timer-container" class="hidden items-center gap-2 bg-medical-danger/20 text-medical-danger px-3 py-1 rounded-full border border-medical-danger">
+                <i class="fas fa-clock animate-pulse-fast"></i>
+                <span id="game-timer">00:00</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="flex-grow p-4 md:p-8 relative overflow-hidden">
+        <div class="scanline z-0"></div>
+        
+        <!-- ================= DASHBOARD VIEW ================= -->
+        <section id="view-dashboard" class="max-w-5xl mx-auto z-10 relative fade-in">
+            <div class="text-center mb-10">
+                <h2 class="text-3xl md:text-5xl font-bold mb-4">Entrenamiento en <span class="text-medical-primary">Reanimación</span></h2>
+                <p class="text-slate-400 max-w-2xl mx-auto">Basado en las Guías SVCA/ACLS. Utiliza elementos de aprendizaje gamificados para mejorar tus conocimientos, ejecución de habilidades y confianza.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <!-- Repaso Card -->
+                <div class="bg-medical-panel rounded-2xl p-6 border border-slate-700 hover:border-medical-primary transition-colors cursor-pointer group flex flex-col items-center text-center btn-game" onclick="app.navigate('repaso')">
+                    <div class="w-20 h-20 rounded-full bg-blue-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-book-medical text-3xl text-blue-400"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Base de Datos (Repaso)</h3>
+                    <p class="text-sm text-slate-400 flex-grow">Estudia los algoritmos fundamentales (Paro cardíaco, Bradicardia, Taquicardia) y farmacología.</p>
+                    <button class="mt-4 bg-blue-600 hover:bg-blue-500 text-white px-6 py-2 rounded-full w-full">Estudiar</button>
+                </div>
+
+                <!-- Escape Room Card -->
+                <div class="bg-medical-panel rounded-2xl p-6 border border-slate-700 hover:border-medical-danger transition-colors cursor-pointer group flex flex-col items-center text-center btn-game relative overflow-hidden" onclick="app.navigate('escape')">
+                    <div class="absolute inset-0 bg-medical-danger/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                    <div class="w-20 h-20 rounded-full bg-red-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-procedures text-3xl text-red-400"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2 text-red-100">Sala de Crisis (Escape Room)</h3>
+                    <p class="text-sm text-slate-400 flex-grow">Megacode Simulator. Tienes poco tiempo para salvar al paciente aplicando los algoritmos en tiempo real.</p>
+                    <button class="mt-4 bg-red-600 hover:bg-red-500 text-white px-6 py-2 rounded-full w-full flex items-center justify-center gap-2">
+                        <i class="fas fa-play"></i> Iniciar Simulación
+                    </button>
+                </div>
+
+                <!-- Evaluacion Card -->
+                <div class="bg-medical-panel rounded-2xl p-6 border border-slate-700 hover:border-medical-success transition-colors cursor-pointer group flex flex-col items-center text-center btn-game" onclick="app.navigate('evaluacion')">
+                    <div class="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                        <i class="fas fa-clipboard-check text-3xl text-green-400"></i>
+                    </div>
+                    <h3 class="text-xl font-bold mb-2">Evaluación Final</h3>
+                    <p class="text-sm text-slate-400 flex-grow">Demuestra tus conocimientos en un test estructurado para obtener tu insignia virtual de certificación.</p>
+                    <button class="mt-4 bg-green-600 hover:bg-green-500 text-white px-6 py-2 rounded-full w-full">Tomar Examen</button>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= REPASO VIEW ================= -->
+        <section id="view-repaso" class="max-w-6xl mx-auto z-10 relative hidden">
+            <button onclick="app.navigate('dashboard')" class="mb-6 text-slate-400 hover:text-white flex items-center gap-2 transition-colors">
+                <i class="fas fa-arrow-left"></i> Volver a la Base
+            </button>
+            
+            <div class="flex flex-col md:flex-row gap-6">
+                <!-- Sidebar menu -->
+                <div class="md:w-1/4 flex flex-col gap-2">
+                    <button class="repaso-tab active bg-medical-primary text-white p-3 rounded-lg text-left font-bold" onclick="app.switchTab('paro')">Paro Cardíaco</button>
+                    <button class="repaso-tab bg-slate-800 text-slate-300 hover:bg-slate-700 p-3 rounded-lg text-left font-bold" onclick="app.switchTab('bradi')">Bradicardia</button>
+                    <button class="repaso-tab bg-slate-800 text-slate-300 hover:bg-slate-700 p-3 rounded-lg text-left font-bold" onclick="app.switchTab('taqui')">Taquicardia</button>
+                    <button class="repaso-tab bg-slate-800 text-slate-300 hover:bg-slate-700 p-3 rounded-lg text-left font-bold" onclick="app.switchTab('farmacos')">Farmacología</button>
+                </div>
+                
+                <!-- Content Area -->
+                <div class="md:w-3/4 bg-medical-panel rounded-2xl p-6 border border-slate-700 monitor-screen">
+                    <!-- Paro -->
+                    <div id="tab-paro" class="tab-content">
+                        <h3 class="text-2xl font-bold mb-4 text-medical-danger border-b border-slate-600 pb-2"><i class="fas fa-heart-broken mr-2"></i>Algoritmo de Paro Cardíaco</h3>
+                        <ul class="space-y-4 text-slate-200">
+                            <li class="bg-slate-800 p-4 rounded-lg border-l-4 border-medical-danger">
+                                <strong class="text-white block mb-1">1. Ritmos Desfibrilables (FV / TV sin pulso):</strong>
+                                RCP 2 min -> Descarga -> RCP 2 min + Adrenalina (1 mg cada 3-5 min) -> Descarga -> RCP 2 min + Amiodarona (300 mg).
+                            </li>
+                            <li class="bg-slate-800 p-4 rounded-lg border-l-4 border-slate-500">
+                                <strong class="text-white block mb-1">2. Ritmos No Desfibrilables (Asistolia / AESP):</strong>
+                                RCP 2 min + Adrenalina (1 mg lo antes posible, luego cada 3-5 min) -> Evaluar ritmo -> Tratar causas reversibles (Las 5H y 5T).
+                            </li>
+                            <li class="bg-slate-800 p-4 rounded-lg border-l-4 border-medical-primary">
+                                <strong class="text-white block mb-1">Calidad de la RCP:</strong>
+                                Comprimir fuerte (al menos 5 cm) y rápido (100-120 cpm). Minimizar interrupciones. Cambiar de compresor cada 2 min. Relación 30:2 sin vía avanzada.
+                            </li>
+                        </ul>
+                    </div>
+                    
+                    <!-- Bradi -->
+                    <div id="tab-bradi" class="tab-content hidden">
+                        <h3 class="text-2xl font-bold mb-4 text-medical-warning border-b border-slate-600 pb-2"><i class="fas fa-arrow-down mr-2"></i>Algoritmo de Bradicardia con pulso</h3>
+                        <p class="mb-4 text-slate-300">Evaluar frecuencia (generalmente &lt; 50 lpm). Identificar y tratar la causa subyacente.</p>
+                        <div class="bg-slate-800 p-4 rounded-lg mb-4">
+                            <strong class="text-white block mb-2">¿Es persistente y causa síntomas (hipotensión, alteración mental, shock, isquemia, insuficiencia cardíaca)?</strong>
+                            <div class="flex gap-4 mt-2">
+                                <div class="w-1/2 bg-red-900/30 p-3 rounded border border-red-500/50">
+                                    <span class="text-red-400 font-bold block">SÍ (Inestable)</span>
+                                    <ul class="list-disc list-inside mt-2 text-sm space-y-1">
+                                        <li><strong>Atropina:</strong> Primera dosis Bolo de 0,5 mg (Repetir cada 3-5 min. Máximo: 3 mg).</li>
+                                        <li>Si es ineficaz: Electroestimulación cardíaca transcutánea (Marcapasos) <strong>O</strong> Infusión de dopamina (2-20 mcg/kg/min) <strong>O</strong> Infusión de adrenalina (2-10 mcg/min).</li>
+                                    </ul>
+                                </div>
+                                <div class="w-1/2 bg-green-900/30 p-3 rounded border border-green-500/50">
+                                    <span class="text-green-400 font-bold block">NO (Estable)</span>
+                                    <p class="mt-2 text-sm">Monitorizar y observar.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Taqui -->
+                    <div id="tab-taqui" class="tab-content hidden">
+                        <h3 class="text-2xl font-bold mb-4 text-medical-warning border-b border-slate-600 pb-2"><i class="fas fa-arrow-up mr-2"></i>Algoritmo de Taquicardia con pulso</h3>
+                        <p class="mb-4 text-slate-300">Evaluar frecuencia (generalmente &ge; 150 lpm). Tratar causa subyacente.</p>
+                        <div class="bg-slate-800 p-4 rounded-lg mb-4">
+                            <strong class="text-white block mb-2">¿Causa inestabilidad hemodinámica?</strong>
+                            <ul class="list-disc list-inside mt-2 text-sm space-y-2">
+                                <li class="bg-red-900/20 p-2 rounded"><strong>Sí (Inestable):</strong> Cardioversión sincronizada. Considerar sedación.</li>
+                                <li class="bg-blue-900/20 p-2 rounded"><strong>No (Estable):</strong> Evaluar complejo QRS.
+                                    <ul class="ml-6 mt-1 text-slate-300">
+                                        <li><em>QRS ancho (&ge; 0,12s):</em> Acceso IV, ECG. Considerar adenosina (solo si regular y monomórfico), amiodarona o procainamida.</li>
+                                        <li><em>QRS estrecho:</em> Maniobras vagales. <strong>Adenosina</strong> (si es regular, dosis inicial 6mg, segunda 12mg). Betabloqueantes o calcio-antagonistas.</li>
+                                    </ul>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Farmacos -->
+                    <div id="tab-farmacos" class="tab-content hidden">
+                        <h3 class="text-2xl font-bold mb-4 text-medical-primary border-b border-slate-600 pb-2"><i class="fas fa-pills mr-2"></i>Farmacología SVCA/ACLS</h3>
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left text-sm text-slate-300 border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-800 text-white">
+                                        <th class="p-3 border border-slate-700">Fármaco</th>
+                                        <th class="p-3 border border-slate-700">Indicaciones principales</th>
+                                        <th class="p-3 border border-slate-700">Dosis en adultos</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="p-3 border border-slate-700 font-bold text-red-300">Adrenalina</td>
+                                        <td class="p-3 border border-slate-700">Paro cardíaco, Bradicardia sintomática (infusión)</td>
+                                        <td class="p-3 border border-slate-700">Paro: 1 mg IV/IO cada 3-5 min.<br>Bradicardia: 2-10 mcg/min.</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="p-3 border border-slate-700 font-bold text-blue-300">Amiodarona</td>
+                                        <td class="p-3 border border-slate-700">FV/TV sin pulso refractaria, Taquicardias</td>
+                                        <td class="p-3 border border-slate-700">Paro: 1ª 300 mg, 2ª 150 mg.<br>Taqui estable: 150 mg en 10 min.</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="p-3 border border-slate-700 font-bold text-yellow-300">Atropina</td>
+                                        <td class="p-3 border border-slate-700">Bradicardia sintomática</td>
+                                        <td class="p-3 border border-slate-700">Bolo de 0,5 mg cada 3-5 min. Máx: 3 mg.</td>
+                                    </tr>
+                                    <tr class="hover:bg-slate-800/50">
+                                        <td class="p-3 border border-slate-700 font-bold text-purple-300">Adenosina</td>
+                                        <td class="p-3 border border-slate-700">Taquicardia supraventricular regular estrecha</td>
+                                        <td class="p-3 border border-slate-700">1ª dosis: 6 mg IV rápido. 2ª dosis: 12 mg.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- ================= ESCAPE ROOM VIEW ================= -->
+        <section id="view-escape" class="max-w-5xl mx-auto z-10 relative hidden">
+            <div class="flex justify-between items-center mb-4">
+                <button onclick="app.endGame()" class="text-slate-400 hover:text-white flex items-center gap-2">
+                    <i class="fas fa-door-open"></i> Abortar Simulación
+                </button>
+                <div class="text-medical-neon font-mono font-bold bg-slate-800 px-4 py-2 rounded-lg border border-medical-neon">
+                    Estado Paciente: <span id="patient-status-text">CRÍTICO</span>
+                </div>
+            </div>
+
+            <div class="bg-medical-panel rounded-2xl border-2 border-slate-600 overflow-hidden shadow-2xl flex flex-col md:flex-row">
+                
+                <!-- Monitor (Left Side) -->
+                <div class="md:w-1/2 bg-black p-4 monitor-screen relative flex flex-col justify-between" style="min-h: 300px;">
+                    <!-- Vitals -->
+                    <div class="grid grid-cols-2 gap-4 font-mono">
+                        <div class="border border-green-900/50 p-2 rounded bg-green-900/10">
+                            <div class="text-green-500 text-sm">FC (BPM)</div>
+                            <div id="monitor-hr" class="text-5xl text-green-400 font-bold mt-1">--</div>
+                        </div>
+                        <div class="border border-blue-900/50 p-2 rounded bg-blue-900/10">
+                            <div class="text-blue-500 text-sm">SpO2 (%)</div>
+                            <div id="monitor-spo2" class="text-5xl text-blue-400 font-bold mt-1">--</div>
+                        </div>
+                        <div class="border border-red-900/50 p-2 rounded bg-red-900/10 col-span-2">
+                            <div class="text-red-500 text-sm">PA (mmHg)</div>
+                            <div id="monitor-bp" class="text-4xl text-red-400 font-bold mt-1">-- / --</div>
+                        </div>
+                    </div>
+
+                    <!-- ECG Animation -->
+                    <div class="mt-6 h-24 border-b border-t border-green-900/30 relative overflow-hidden flex items-center">
+                        <svg class="w-full h-16 text-green-500" id="ecg-svg" viewBox="0 0 500 100" preserveAspectRatio="none">
+                            <!-- SVG Path will be injected by JS based on rhythm -->
+                            <path id="ecg-line" fill="none" stroke="currentColor" stroke-width="2" class="ecg-path" d="M0,50 L500,50" />
+                        </svg>
+                        <!-- Sweep effect -->
+                        <div class="absolute inset-0 bg-gradient-to-r from-transparent to-black w-full h-full mix-blend-overlay"></div>
+                    </div>
+                    
+                    <div id="monitor-rhythm-name" class="absolute bottom-2 right-4 text-green-500 font-mono text-sm opacity-50 uppercase">Asistolia</div>
+                </div>
+
+                <!-- Interaction Panel (Right Side) -->
+                <div class="md:w-1/2 p-6 bg-slate-800 flex flex-col">
+                    <h3 class="text-xl font-bold mb-2 text-white border-b border-slate-700 pb-2">Registro Médico</h3>
+                    
+                    <div id="game-scenario-text" class="text-slate-300 flex-grow mb-6 overflow-y-auto max-h-48 pr-2 space-y-3 font-mono text-sm">
+                        <!-- Dialogue goes here -->
+                        <div class="text-medical-neon">> Inicializando simulación...</div>
+                    </div>
+
+                    <div id="game-choices" class="space-y-3">
+                        <!-- Buttons injected via JS -->
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Patient Vitality Bar -->
+            <div class="mt-4 bg-slate-800 rounded-full h-4 border border-slate-600 overflow-hidden">
+                <div id="vitality-bar" class="bg-medical-success h-full transition-all duration-500" style="width: 100%;"></div>
+            </div>
+        </section>
+
+        <!-- ================= EVALUACION VIEW ================= -->
+        <section id="view-evaluacion" class="max-w-3xl mx-auto z-10 relative hidden">
+            <button onclick="app.navigate('dashboard')" class="mb-6 text-slate-400 hover:text-white flex items-center gap-2 transition-colors">
+                <i class="fas fa-arrow-left"></i> Volver a la Base
+            </button>
+
+            <div id="quiz-intro" class="bg-medical-panel rounded-2xl p-8 border border-slate-700 text-center neon-border">
+                <i class="fas fa-award text-6xl text-medical-warning mb-4"></i>
+                <h2 class="text-3xl font-bold mb-4">Evaluación de Competencias</h2>
+                <p class="text-slate-300 mb-6">Basado en las actualizaciones 2020-2025 de ACE. Demuestra tu dominio en SVCA/ACLS para obtener tu certificación virtual.</p>
+                <button onclick="app.startQuiz()" class="bg-medical-primary hover:bg-blue-500 text-white px-8 py-3 rounded-full font-bold text-lg btn-game">Comenzar Test</button>
+            </div>
+
+            <div id="quiz-container" class="hidden bg-medical-panel rounded-2xl p-6 md:p-10 border border-slate-700 relative">
+                <div class="flex justify-between items-center mb-6 border-b border-slate-600 pb-4">
+                    <span class="text-slate-400 font-mono" id="quiz-progress">Pregunta 1 de 5</span>
+                    <span class="text-medical-warning font-mono font-bold">Puntos: <span id="quiz-score">0</span></span>
+                </div>
+                
+                <h3 id="quiz-question" class="text-xl md:text-2xl font-bold mb-6 text-white">¿Pregunta?</h3>
+                
+                <div id="quiz-options" class="space-y-3">
+                    <!-- Options injected via JS -->
+                </div>
+            </div>
+
+            <div id="quiz-results" class="hidden bg-medical-panel rounded-2xl p-8 border border-slate-700 text-center">
+                <div id="quiz-result-icon" class="text-6xl mb-4">🏆</div>
+                <h2 class="text-3xl font-bold mb-2">Evaluación Completada</h2>
+                <p id="quiz-result-text" class="text-xl text-slate-300 mb-6">Puntuación: 0/5</p>
+                <div id="quiz-feedback" class="mb-6 text-sm text-slate-400 p-4 bg-slate-800 rounded text-left overflow-y-auto max-h-40"></div>
+                <button onclick="app.navigate('dashboard')" class="bg-medical-primary hover:bg-blue-500 text-white px-8 py-3 rounded-full font-bold btn-game">Volver al Dashboard</button>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Custom Modal for Alerts -->
+    <div id="custom-alert" class="fixed inset-0 z-[100] hidden items-center justify-center modal-overlay">
+        <div class="bg-medical-panel border border-slate-600 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl transform scale-95 transition-transform duration-200" id="alert-box">
+            <div class="flex items-center gap-4 mb-4">
+                <i id="alert-icon" class="fas fa-info-circle text-3xl text-medical-primary"></i>
+                <h3 id="alert-title" class="text-xl font-bold">Alerta</h3>
+            </div>
+            <p id="alert-message" class="text-slate-300 mb-6"></p>
+            <button onclick="app.closeAlert()" class="w-full bg-slate-700 hover:bg-slate-600 text-white py-2 rounded-lg font-bold">Entendido</button>
+        </div>
+    </div>
+
+    <script>
+        const app = {
+            currentView: 'dashboard',
+            globalScore: 0,
+            
+            // --- Navigation & Core ---
+            init: function() {
+                // Initialize stuff
+            },
+            
+            navigate: function(viewId) {
+                // Hide all views
+                document.querySelectorAll('main > section').forEach(el => el.classList.add('hidden'));
+                // Show target
+                document.getElementById(`view-${viewId}`).classList.remove('hidden');
+                
+                // Special handling
+                if(this.currentView === 'escape' && viewId !== 'escape') {
+                    this.endGame();
+                }
+                
+                this.currentView = viewId;
+                window.scrollTo(0,0);
+            },
+
+            showAlert: function(title, message, type = 'info') {
+                const modal = document.getElementById('custom-alert');
+                const box = document.getElementById('alert-box');
+                const titleEl = document.getElementById('alert-title');
+                const msgEl = document.getElementById('alert-message');
+                const icon = document.getElementById('alert-icon');
+
+                titleEl.textContent = title;
+                msgEl.textContent = message;
+
+                icon.className = 'fas text-3xl ' + 
+                    (type === 'error' ? 'fa-exclamation-triangle text-medical-danger' : 
+                     type === 'success' ? 'fa-check-circle text-medical-success' : 
+                     'fa-info-circle text-medical-primary');
+                
+                box.className = `bg-medical-panel border-2 rounded-xl p-6 max-w-sm w-full mx-4 shadow-2xl transform scale-100 transition-transform duration-200 ${
+                    type === 'error' ? 'border-medical-danger' : 
+                    type === 'success' ? 'border-medical-success' : 'border-medical-primary'
+                }`;
+
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+            },
+
+            closeAlert: function() {
+                const modal = document.getElementById('custom-alert');
+                modal.classList.add('hidden');
+                modal.classList.remove('flex');
+            },
+
+            addScore: function(points) {
+                this.globalScore += points;
+                document.getElementById('global-score').textContent = `Puntos: ${this.globalScore}`;
+            },
+
+            // --- Repaso Logic ---
+            switchTab: function(tabId) {
+                document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+                document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+                
+                document.querySelectorAll('.repaso-tab').forEach(btn => {
+                    btn.classList.remove('bg-medical-primary', 'text-white');
+                    btn.classList.add('bg-slate-800', 'text-slate-300');
+                });
+                const activeBtn = document.querySelector(`.repaso-tab[onclick="app.switchTab('${tabId}')"]`);
+                activeBtn.classList.remove('bg-slate-800', 'text-slate-300');
+                activeBtn.classList.add('bg-medical-primary', 'text-white');
+            },
+
+            // --- Escape Room (Megacode) Logic ---
+            gameTimer: null,
+            timeRemaining: 180,
+            vitality: 100,
+            currentScenario: 0,
+            scenarios: [
+                {
+                    id: 0,
+                    text: "> Ingresas a urgencias. Paciente varón 60 años, inconsciente. Monitor muestra Asistolia. El equipo te mira esperando órdenes.",
+                    vitals: { hr: "0", spo2: "--", bp: "0 / 0", rhythm: "Asistolia", path: "M0,50 L500,50" },
+                    choices: [
+                        { text: "Administrar Descarga 200J", next: -1, msg: "¡Error crítico! La asistolia NO es desfibrilable.", vitalHit: 40 },
+                        { text: "Iniciar RCP 2 min y acceso IV/IO", next: 1, msg: "¡Correcto! Iniciando compresiones torácicas y estableciendo vía.", vitalHit: 0 },
+                        { text: "Administrar Atropina 0,5 mg", next: -1, msg: "Incorrecto. La atropina ya no se recomienda de rutina en asistolia.", vitalHit: 20 }
+                    ]
+                },
+                {
+                    id: 1,
+                    text: "> RCP en curso de alta calidad. Tenemos acceso IV. ¿Qué fármaco administramos primero según el algoritmo de paro?",
+                    vitals: { hr: "0", spo2: "85", bp: "Mecánica", rhythm: "Asistolia", path: "M0,50 Q10,40 20,50 T40,50 Q50,45 60,50 T80,50 L500,50" },
+                    choices: [
+                        { text: "Amiodarona 300 mg", next: -1, msg: "Error. Amiodarona es para FV/TV refractaria.", vitalHit: 20 },
+                        { text: "Adrenalina 1 mg", next: 2, msg: "¡Excelente! Adrenalina 1 mg administrada. Continuamos RCP.", vitalHit: 0 },
+                        { text: "Adenosina 6 mg", next: -1, msg: "Error. Adenosina es para taquicardias supraventriculares.", vitalHit: 20 }
+                    ]
+                },
+                {
+                    id: 2,
+                    text: "> Han pasado 2 minutos. Evaluamos ritmo. El monitor muestra Fibrilación Ventricular (FV).",
+                    vitals: { hr: "???", spo2: "88", bp: "0 / 0", rhythm: "Fibrilación Ventricular", path: "M0,50 Q20,10 40,80 T80,30 T120,90 T160,20 T200,80 T240,40 T280,90 T320,10 T360,70 T400,20 T440,80 T480,40 L500,50" },
+                    choices: [
+                        { text: "Administrar Descarga de inmediato", next: 3, msg: "¡Correcto! La FV es un ritmo desfibrilable.", vitalHit: 0 },
+                        { text: "Pulsar el botón de sincronización", next: -1, msg: "Error. La cardioversión sincronizada no se usa en FV.", vitalHit: 20 },
+                        { text: "Reanudar RCP sin descargar", next: -1, msg: "Error. Retrasar la desfibrilación disminuye la supervivencia.", vitalHit: 30 }
+                    ]
+                },
+                {
+                    id: 3,
+                    text: "> Descarga administrada. El paciente hace un leve movimiento. ¿Qué hacemos inmediatamente después?",
+                    vitals: { hr: "???", spo2: "--", bp: "--", rhythm: "Artefacto", path: "M0,50 L100,50 L120,-50 L150,150 L180,50 L500,50" },
+                    choices: [
+                        { text: "Comprobar pulso inmediatamente", next: -1, msg: "Incorrecto. No se interrumpe la RCP para chequear pulso tras descarga.", vitalHit: 30 },
+                        { text: "Reanudar RCP por 2 minutos", next: 4, msg: "¡Perfecto! Se reanuda RCP para asegurar perfusión coronaria.", vitalHit: 0 }
+                    ]
+                },
+                {
+                    id: 4,
+                    text: "> Han pasado 2 minutos de RCP post-descarga. Evaluamos ritmo: Bradicardia sinusal. Comprobamos pulso: ¡Tiene pulso! Inicias cuidados posparo (RCE).",
+                    vitals: { hr: "45", spo2: "94", bp: "85 / 50", rhythm: "Bradicardia Sinusal", path: "M0,50 L20,50 Q30,40 40,50 L60,50 L65,30 L75,100 L85,-20 L95,50 L110,50 Q130,20 150,50 L300,50 L320,50 Q330,40 340,50 L360,50 L365,30 L375,100 L385,-20 L395,50 L410,50 Q430,20 450,50 L500,50" },
+                    choices: [
+                        { text: "Mantener SpO2 > 94% y tratar hipotensión", next: 5, msg: "¡Misión Cumplida! Paciente estabilizado y trasladado a UCI.", vitalHit: 0 },
+                        { text: "Hiperventilar al paciente con O2 100%", next: -1, msg: "Error. Evitar ventilación excesiva posparo.", vitalHit: 20 }
+                    ]
+                }
+            ],
+
+            startGame: function() {
+                this.timeRemaining = 120; // 2 minutes to save
+                this.vitality = 100;
+                this.currentScenario = 0;
+                this.updateVitality();
+                
+                document.getElementById('game-timer-container').classList.remove('hidden');
+                document.getElementById('game-timer-container').classList.add('flex');
+                document.getElementById('game-scenario-text').innerHTML = '';
+                
+                this.renderScenario();
+                
+                clearInterval(this.gameTimer);
+                this.gameTimer = setInterval(() => {
+                    this.timeRemaining--;
+                    let min = Math.floor(this.timeRemaining / 60);
+                    let sec = this.timeRemaining % 60;
+                    document.getElementById('game-timer').textContent = `${min < 10 ? '0':''}${min}:${sec < 10 ? '0':''}${sec}`;
+                    
+                    if (this.timeRemaining <= 30) {
+                        document.getElementById('game-timer-container').classList.replace('text-medical-danger', 'text-red-500');
+                        document.getElementById('game-timer-container').classList.add('animate-pulse');
+                    }
+                    
+                    if(this.timeRemaining <= 0) {
+                        this.gameOver("Se acabó el tiempo. El daño cerebral irreversible se ha establecido.");
+                    }
+                }, 1000);
+            },
+
+            renderScenario: function() {
+                const s = this.scenarios[this.currentScenario];
+                
+                // Update Vitals
+                document.getElementById('monitor-hr').textContent = s.vitals.hr;
+                document.getElementById('monitor-spo2').textContent = s.vitals.spo2;
+                document.getElementById('monitor-bp').textContent = s.vitals.bp;
+                document.getElementById('monitor-rhythm-name').textContent = s.vitals.rhythm;
+                document.getElementById('ecg-line').setAttribute('d', s.vitals.path);
+                
+                // Vitals color based on status
+                const ecgLine = document.getElementById('ecg-line');
+                if(s.vitals.hr === "0" || s.vitals.hr === "???") {
+                    ecgLine.style.color = "#ef4444"; // Red for arrest/vf
+                } else {
+                    ecgLine.style.color = "#10b981"; // Green
+                }
+
+                // Append Text
+                const txtLog = document.getElementById('game-scenario-text');
+                txtLog.innerHTML += `<div class="mt-4 text-white">${s.text}</div>`;
+                txtLog.scrollTop = txtLog.scrollHeight;
+                
+                // Render Choices
+                const choiceContainer = document.getElementById('game-choices');
+                choiceContainer.innerHTML = '';
+                
+                s.choices.forEach(choice => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full bg-slate-700 hover:bg-slate-600 text-left p-3 rounded-lg border border-slate-600 text-sm md:text-base font-bold text-white transition-colors flex items-center justify-between group";
+                    btn.innerHTML = `<span>${choice.text}</span> <i class="fas fa-chevron-right opacity-0 group-hover:opacity-100 transition-opacity"></i>`;
+                    btn.onclick = () => this.handleChoice(choice);
+                    choiceContainer.appendChild(btn);
+                });
+            },
+
+            handleChoice: function(choice) {
+                const txtLog = document.getElementById('game-scenario-text');
+                
+                if (choice.next === -1) {
+                    // Wrong choice
+                    this.vitality -= choice.vitalHit;
+                    this.updateVitality();
+                    txtLog.innerHTML += `<div class="mt-2 text-medical-danger border-l-2 border-medical-danger pl-2">${choice.msg}</div>`;
+                    txtLog.scrollTop = txtLog.scrollHeight;
+                    
+                    this.addScore(-5);
+                    
+                    if(this.vitality <= 0) {
+                        this.gameOver("Los signos vitales han colapsado por completo. Reanimación fallida.");
+                    }
+                } else {
+                    // Correct choice
+                    txtLog.innerHTML += `<div class="mt-2 text-medical-success border-l-2 border-medical-success pl-2">${choice.msg}</div>`;
+                    this.addScore(20);
+                    
+                    this.currentScenario = choice.next;
+                    
+                    // Win condition check
+                    if (this.currentScenario === 5) {
+                        this.gameWin();
+                    } else {
+                        setTimeout(() => this.renderScenario(), 1000);
+                    }
+                }
+            },
+
+            updateVitality: function() {
+                const bar = document.getElementById('vitality-bar');
+                bar.style.width = `${Math.max(0, this.vitality)}%`;
+                
+                if (this.vitality > 60) bar.className = "bg-medical-success h-full transition-all duration-500";
+                else if (this.vitality > 30) bar.className = "bg-medical-warning h-full transition-all duration-500";
+                else bar.className = "bg-medical-danger h-full transition-all duration-500 animate-pulse";
+            },
+
+            gameOver: function(msg) {
+                clearInterval(this.gameTimer);
+                document.getElementById('game-choices').innerHTML = '';
+                document.getElementById('game-timer-container').classList.add('hidden');
+                
+                document.getElementById('monitor-hr').textContent = "0";
+                document.getElementById('monitor-bp').textContent = "0 / 0";
+                document.getElementById('ecg-line').setAttribute('d', "M0,50 L500,50");
+                document.getElementById('ecg-line').style.color = "#ef4444";
+                
+                this.showAlert("Simulación Fallida", msg, "error");
+            },
+
+            gameWin: function() {
+                clearInterval(this.gameTimer);
+                document.getElementById('game-choices').innerHTML = '';
+                document.getElementById('game-timer-container').classList.add('hidden');
+                
+                const timeBonus = Math.floor(this.timeRemaining / 2);
+                this.addScore(100 + timeBonus);
+                
+                this.showAlert("¡Paciente Salvado!", `Excelente trabajo de equipo. Aplicaste correctamente el algoritmo SVCA. Bonus de tiempo: +${timeBonus} pts.`, "success");
+            },
+
+            endGame: function() {
+                clearInterval(this.gameTimer);
+                document.getElementById('game-timer-container').classList.add('hidden');
+                document.getElementById('game-timer-container').classList.remove('animate-pulse');
+            },
+
+            // --- Evaluation (Quiz) Logic ---
+            quizData: [
+                {
+                    q: "¿Cuál es la dosis inicial recomendada de atropina para la bradicardia sintomática?",
+                    options: ["1 mg IV", "Bolo de 0,5 mg", "3 mg IV", "Infusión de 2 mcg/min"],
+                    correct: 1,
+                    explanation: "Según las guías recientes provistas, la primera dosis de atropina en bradicardia es un bolo de 0,5 mg (hasta un máximo de 3 mg)."
+                },
+                {
+                    q: "En el algoritmo de paro cardíaco, ¿qué debe hacerse INMEDIATAMENTE después de administrar una descarga en FV?",
+                    options: ["Comprobar el pulso", "Administrar 1 mg de adrenalina", "Reanudar la RCP durante 2 minutos", "Administrar amiodarona"],
+                    correct: 2,
+                    explanation: "Para minimizar las pausas en las compresiones, se debe reanudar la RCP inmediatamente durante 2 minutos tras la descarga antes de chequear el ritmo o el pulso."
+                },
+                {
+                    q: "¿Qué ritmo de los siguientes NO es desfibrilable?",
+                    options: ["Taquicardia Ventricular sin pulso", "Fibrilación Ventricular", "Asistolia", "Fibrilación Ventricular fina"],
+                    correct: 2,
+                    explanation: "La Asistolia y la Actividad Eléctrica Sin Pulso (AESP) son ritmos no desfibrilables. El tratamiento principal es RCP continua y Adrenalina."
+                },
+                {
+                    q: "Para un paciente con taquicardia de complejo ancho (QRS ≥ 0,12s) estable, ¿qué tratamiento se puede considerar si el ritmo es regular y monomórfico?",
+                    options: ["Desfibrilación a 360J", "Adenosina", "Atropina", "Cardioversión no sincronizada"],
+                    correct: 1,
+                    explanation: "Se puede considerar la administración de adenosina SÓLO si la taquicardia de QRS ancho es regular y monomórfica, con un acceso IV disponible."
+                },
+                {
+                    q: "¿Qué parámetro de calidad de la RCP cuantitativa indica intentar mejorar la calidad si la presión en fase de relajación (diastólica) intraarterial es baja?",
+                    options: ["< 20 mm Hg", "< 10 mm Hg", "< 35 mm Hg", "< 50 mm Hg"],
+                    correct: 0,
+                    explanation: "Si se usa presión intraarterial y la presión diastólica es < 20 mm Hg, se debe intentar mejorar la calidad de la RCP."
+                }
+            ],
+            currentQuestion: 0,
+            quizScore: 0,
+            quizHistory: [],
+
+            startQuiz: function() {
+                this.currentQuestion = 0;
+                this.quizScore = 0;
+                this.quizHistory = [];
+                
+                document.getElementById('quiz-intro').classList.add('hidden');
+                document.getElementById('quiz-results').classList.add('hidden');
+                document.getElementById('quiz-container').classList.remove('hidden');
+                document.getElementById('quiz-score').textContent = "0";
+                
+                this.loadQuestion();
+            },
+
+            loadQuestion: function() {
+                const q = this.quizData[this.currentQuestion];
+                document.getElementById('quiz-progress').textContent = `Pregunta ${this.currentQuestion + 1} de ${this.quizData.length}`;
+                document.getElementById('quiz-question').textContent = q.q;
+                
+                const optContainer = document.getElementById('quiz-options');
+                optContainer.innerHTML = '';
+                
+                q.options.forEach((opt, index) => {
+                    const btn = document.createElement('button');
+                    btn.className = "w-full text-left bg-slate-800 hover:bg-slate-700 p-4 rounded-xl border border-slate-600 transition-all font-semibold";
+                    btn.textContent = opt;
+                    btn.onclick = () => this.handleAnswer(index);
+                    optContainer.appendChild(btn);
+                });
+            },
+
+            handleAnswer: function(selectedIndex) {
+                const q = this.quizData[this.currentQuestion];
+                const isCorrect = (selectedIndex === q.correct);
+                
+                this.quizHistory.push({
+                    q: q.q,
+                    isCorrect: isCorrect,
+                    exp: q.explanation
+                });
+
+                if(isCorrect) {
+                    this.quizScore++;
+                    this.addScore(50);
+                    document.getElementById('quiz-score').textContent = (this.quizScore * 50).toString();
+                }
+
+                this.currentQuestion++;
+                if (this.currentQuestion < this.quizData.length) {
+                    this.loadQuestion();
+                } else {
+                    this.finishQuiz();
+                }
+            },
+
+            finishQuiz: function() {
+                document.getElementById('quiz-container').classList.add('hidden');
+                const resultsBlock = document.getElementById('quiz-results');
+                resultsBlock.classList.remove('hidden');
+                
+                const ratio = this.quizScore / this.quizData.length;
+                let icon = '🏆';
+                let msg = `Puntuación: ${this.quizScore}/${this.quizData.length}`;
+                
+                if (ratio === 1) icon = '🌟';
+                else if (ratio < 0.6) icon = '📚';
+                
+                document.getElementById('quiz-result-icon').textContent = icon;
+                document.getElementById('quiz-result-text').textContent = msg;
+                
+                // Feedback
+                const feedbackDiv = document.getElementById('quiz-feedback');
+                feedbackDiv.innerHTML = '<h4 class="font-bold text-white mb-2">Revisión:</h4>';
+                
+                this.quizHistory.forEach((item, i) => {
+                    const color = item.isCorrect ? 'text-medical-success' : 'text-medical-danger';
+                    const symbol = item.isCorrect ? '✓' : '✗';
+                    feedbackDiv.innerHTML += `
+                        <div class="mb-3 pb-3 border-b border-slate-700 last:border-0">
+                            <p class="${color} font-bold">${symbol} P${i+1}: ${item.q}</p>
+                            <p class="text-xs text-slate-400 mt-1">${item.exp}</p>
+                        </div>
+                    `;
+                });
+            }
+        };
+
+        // Initialize event listener for escape room button specifically to trigger game start
+        document.querySelector('[onclick="app.navigate(\'escape\')"]').addEventListener('click', () => {
+            app.startGame();
+        });
+
+    </script>
+</body>
+</html>
